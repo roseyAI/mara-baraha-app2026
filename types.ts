@@ -47,10 +47,16 @@ export interface Reading {
   interpretation: string;
 }
 
+export interface DailyReading {
+  date: string; // ISO Date "YYYY-MM-DD"
+  card: DrawnCard;
+  interpretation: string;
+}
+
 export interface UserState {
   credits: number;
   readings: Reading[];
-  lastDailyDraw: string | null; // ISO Date string
+  dailyReading: DailyReading | null; 
 }
 
 export const SPREAD_CONFIG: Record<SpreadType, { name: string; positions: string[]; cost: number }> = {

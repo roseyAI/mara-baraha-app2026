@@ -4,9 +4,7 @@ import { useApp } from '../App';
 import { drawCards } from '../services/tarotService';
 import { interpretReading } from '../services/geminiService';
 import Card from '../components/Card';
-import ReactMarkdown from 'react-markdown'; // Actually, I'll simulate basic MD rendering or use simple formatting since adding a library might be tricky without package.json control, but instructions allow standard libraries. I will handle basic newlines.
-// Wait, instructions say "Use popular libraries". I will assume I can't `npm install`. 
-// I'll write a simple text renderer for the output to be safe.
+import { X } from 'lucide-react';
 
 const ReadingPage: React.FC = () => {
   const { user, deductCredit, addReading } = useApp();
@@ -17,6 +15,18 @@ const ReadingPage: React.FC = () => {
   const [interpretation, setInterpretation] = useState('');
   const [loadingAI, setLoadingAI] = useState(false);
   const [revealIndex, setRevealIndex] = useState(-1); // -1 means none
+  
+  // State for Card Zoom Modal
+  const [zoomedCard, setZoomedCard] = useState<DrawnCard | null>(null);
+
+  // Helper to clean text (double check even if prompt says no markdown)
+  const cleanText = (text: string) => {
+    if (!text) return "";
+    return text
+      .replace(/[\*#]/g, '') // Remove asterisks and hashes
+      .replace(/^["']|["']$/g, '') // Remove surrounding quotes
+      .trim();
+  };
 
   // Step 1: Select Spread
   const handleSpreadSelect = (type: SpreadType) => {
@@ -49,19 +59,32 @@ const ReadingPage: React.FC = () => {
 
   // Step 3: Reveal Cards Logic
   const handleRevealCard = (index: number) => {
+    // If card is already revealed, open zoom modal to show details
+    if (index <= revealIndex) {
+      setZoomedCard(drawnCards[index]);
+      return;
+    }
+
+    // Logic for revealing the next card in sequence
     if (index === revealIndex + 1) {
       setRevealIndex(index);
-      // If all revealed, trigger AI
+      
+      // Check if this was the last card
       if (index === drawnCards.length - 1) {
-        generateInterpretation();
+        // Add a delay before showing "Consulting Mara" to let user see the card
+        setTimeout(() => {
+           generateInterpretation();
+        }, 1500); // 1.5s delay
       }
     }
   };
 
   const generateInterpretation = async () => {
     setLoadingAI(true);
-    const result = await interpretReading(selectedSpread!, question, drawnCards);
-    setInterpretation(result);
+    const rawResult = await interpretReading(selectedSpread!, question, drawnCards);
+    const cleanResult = cleanText(rawResult);
+    
+    setInterpretation(cleanResult);
     setLoadingAI(false);
     setStep('result');
 
@@ -72,7 +95,7 @@ const ReadingPage: React.FC = () => {
       spreadType: selectedSpread!,
       question: question,
       cards: drawnCards,
-      interpretation: result
+      interpretation: cleanResult
     };
     addReading(newReading);
   };
@@ -157,11 +180,11 @@ const ReadingPage: React.FC = () => {
 
   if (step === 'revealing') {
     return (
-      <div className="p-6 pt-12 pb-24 flex flex-col items-center min-h-screen">
+      <div className="p-6 pt-12 pb-24 flex flex-col items-center min-h-screen relative">
         <h2 className="text-xl font-serif text-white mb-8">Reveal Your Cards</h2>
         <div className="flex flex-wrap justify-center gap-4">
           {drawnCards.map((drawn, idx) => (
-            <div key={idx} className={`${idx > revealIndex + 1 ? 'opacity-50 grayscale' : 'opacity-100'}`}>
+            <div key={idx} className={`${idx > revealIndex + 1 ? 'opacity-50 grayscale' : 'opacity-100'} transition-all duration-500`}>
               <Card
                 card={drawn.card}
                 isReversed={drawn.isReversed}
@@ -174,14 +197,34 @@ const ReadingPage: React.FC = () => {
           ))}
         </div>
         
+        {/* Loading Overlay */}
         {loadingAI && (
-           <div className="fixed inset-0 bg-black/80 z-50 flex flex-col items-center justify-center p-8 text-center backdrop-blur-sm">
+           <div className="fixed inset-0 bg-black/80 z-50 flex flex-col items-center justify-center p-8 text-center backdrop-blur-sm animate-in fade-in duration-700">
              <div className="w-16 h-16 mb-6 relative">
                 <div className="absolute inset-0 border-4 border-fuchsia-500/30 rounded-full"></div>
                 <div className="absolute inset-0 border-4 border-fuchsia-400 border-t-transparent rounded-full animate-spin"></div>
              </div>
              <h3 className="text-2xl font-serif text-white mb-2">Consulting Mara</h3>
              <p className="text-slate-400 text-sm">Interpreting the symbols and their connections...</p>
+           </div>
+        )}
+
+        {/* Zoom Modal for Revealed Cards */}
+        {zoomedCard && (
+           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300" onClick={() => setZoomedCard(null)}>
+              <div className="relative max-w-sm w-full bg-slate-900 border border-white/10 rounded-2xl p-6 flex flex-col items-center gap-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+                <button onClick={() => setZoomedCard(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white">
+                  <X size={24} />
+                </button>
+                <div className="mt-4">
+                  <Card card={zoomedCard.card} isRevealed={true} size="lg" />
+                </div>
+                <div className="text-center">
+                  <h3 className="text-xl font-serif text-gold-400">{zoomedCard.card.name}</h3>
+                  <p className="text-xs font-bold text-fuchsia-300 uppercase tracking-widest mt-1 mb-2">{zoomedCard.position}</p>
+                  <p className="text-slate-300 text-sm italic">"{zoomedCard.card.description}"</p>
+                </div>
+              </div>
            </div>
         )}
       </div>
@@ -198,9 +241,10 @@ const ReadingPage: React.FC = () => {
 
         <div className="mb-8">
            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">The Spread</h3>
+           <p className="text-xs text-slate-500 mb-2 italic">Tap a card to view details.</p>
            <div className="flex overflow-x-auto gap-4 pb-4 snap-x">
               {drawnCards.map((drawn, idx) => (
-                <div key={idx} className="snap-center shrink-0 flex flex-col items-center">
+                <div key={idx} className="snap-center shrink-0 flex flex-col items-center cursor-pointer" onClick={() => setZoomedCard(drawn)}>
                   <Card card={drawn.card} isReversed={drawn.isReversed} isRevealed={true} size="sm" />
                   <span className="text-[10px] text-fuchsia-300 mt-2 uppercase font-bold">{drawn.position}</span>
                 </div>
@@ -213,7 +257,6 @@ const ReadingPage: React.FC = () => {
              <span className="text-2xl">✨</span> Interpretation
           </h3>
           <div className="prose prose-invert prose-sm prose-p:text-slate-300 prose-headings:text-fuchsia-200">
-             {/* Simple line break rendering if markdown parser isn't available, but let's try simple whitespace preserve */}
              <div className="whitespace-pre-wrap font-light leading-relaxed">
                {interpretation}
              </div>
@@ -226,6 +269,25 @@ const ReadingPage: React.FC = () => {
         >
           New Reading
         </button>
+
+         {/* Reusing Zoom Modal for Result Screen */}
+         {zoomedCard && (
+           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300" onClick={() => setZoomedCard(null)}>
+              <div className="relative max-w-sm w-full bg-slate-900 border border-white/10 rounded-2xl p-6 flex flex-col items-center gap-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+                <button onClick={() => setZoomedCard(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white">
+                  <X size={24} />
+                </button>
+                <div className="mt-4">
+                  <Card card={zoomedCard.card} isRevealed={true} size="lg" />
+                </div>
+                <div className="text-center">
+                  <h3 className="text-xl font-serif text-gold-400">{zoomedCard.card.name}</h3>
+                  <p className="text-xs font-bold text-fuchsia-300 uppercase tracking-widest mt-1 mb-2">{zoomedCard.position}</p>
+                  <p className="text-slate-300 text-sm italic">"{zoomedCard.card.description}"</p>
+                </div>
+              </div>
+           </div>
+        )}
       </div>
     );
   }

@@ -16,8 +16,8 @@ export const drawCards = (count: number, positions: string[]): DrawnCard[] => {
 
   for (let i = 0; i < count; i++) {
     const card = shuffled[i];
-    // 30% chance of reversal
-    const isReversed = Math.random() < 0.3; 
+    // Mara Baraha method: No reversals, always upright.
+    const isReversed = false; 
     drawn.push({
       card,
       isReversed,

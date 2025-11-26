@@ -5,14 +5,14 @@ import Home from './pages/Home';
 import ReadingPage from './pages/Reading';
 import HistoryPage from './pages/History';
 import ProfilePage from './pages/Profile';
-import { UserState, Reading } from './types';
+import { UserState, Reading, DailyReading } from './types';
 
 // --- Context Setup ---
 interface AppContextType {
   user: UserState;
   addReading: (reading: Reading) => void;
   deductCredit: (amount: number) => boolean;
-  updateDailyDraw: () => void;
+  saveDailyReading: (reading: DailyReading) => void;
   resetCredits: () => void; // For demo purposes
 }
 
@@ -31,7 +31,7 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : {
       credits: 3, // Free starting credits
       readings: [],
-      lastDailyDraw: null
+      dailyReading: null
     };
   });
 
@@ -54,8 +54,8 @@ const App: React.FC = () => {
     return false;
   };
 
-  const updateDailyDraw = () => {
-    setUser(prev => ({ ...prev, lastDailyDraw: new Date().toISOString().split('T')[0] }));
+  const saveDailyReading = (reading: DailyReading) => {
+    setUser(prev => ({ ...prev, dailyReading: reading }));
   };
 
   const resetCredits = () => {
@@ -63,7 +63,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <AppContext.Provider value={{ user, addReading, deductCredit, updateDailyDraw, resetCredits }}>
+    <AppContext.Provider value={{ user, addReading, deductCredit, saveDailyReading, resetCredits }}>
       <HashRouter>
         <Layout>
           <Routes>

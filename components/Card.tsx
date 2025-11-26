@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { TarotCard } from '../types';
+import { CARD_BACK_IMAGE } from '../constants';
 
 interface CardProps {
   card?: TarotCard;
-  isReversed?: boolean;
+  isReversed?: boolean; // Kept in interface for compatibility, but ignored visually
   isRevealed: boolean;
   onClick?: () => void;
   size?: 'sm' | 'md' | 'lg';
@@ -43,18 +44,27 @@ const Card: React.FC<CardProps> = ({
           className={`w-full h-full relative transform-style-3d transition-transform duration-1000 ease-in-out ${isRevealed ? 'rotate-y-180' : ''}`}
         >
           {/* Card Back */}
-          <div className="absolute w-full h-full backface-hidden rounded-xl shadow-2xl overflow-hidden border border-white/10 bg-gradient-to-br from-slate-800 to-slate-950 flex items-center justify-center">
-             <div className="absolute inset-2 border border-fuchsia-500/30 rounded-lg flex items-center justify-center">
-                <div className="w-8 h-8 rounded-full border border-fuchsia-500/50 flex items-center justify-center">
-                  <div className="w-4 h-4 rotate-45 bg-fuchsia-500/20"></div>
-                </div>
+          <div className="absolute w-full h-full backface-hidden rounded-xl shadow-2xl overflow-hidden border border-white/10 bg-slate-900">
+             {/* If we have a custom card back image */}
+             <div className="absolute inset-0 bg-slate-900">
+                <img 
+                  src={CARD_BACK_IMAGE} 
+                  alt="Card Back" 
+                  className="w-full h-full object-cover opacity-90"
+                  onError={(e) => {
+                    // Fallback purely generative back if image fails
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
              </div>
-             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-30"></div>
+             
+             {/* Decorative fallback overlay if image fails or just to add depth */}
+             <div className="absolute inset-0 bg-gradient-to-br from-transparent to-black/40 pointer-events-none"></div>
           </div>
 
           {/* Card Front */}
-          <div className="absolute w-full h-full backface-hidden rotate-y-180 rounded-xl shadow-xl overflow-hidden bg-slate-900 border-2 border-gold-500/40">
-            <div className={`w-full h-full bg-slate-900 relative ${isReversed ? 'rotate-180' : ''}`}>
+          <div className="absolute w-full h-full backface-hidden rotate-y-180 rounded-xl shadow-xl overflow-hidden bg-white border-4 border-white">
+            <div className={`w-full h-full relative bg-white flex items-center justify-center`}>
               
               {card?.image && !imgError ? (
                 <>
@@ -62,16 +72,16 @@ const Card: React.FC<CardProps> = ({
                   <img 
                     src={card.image} 
                     alt={card.name}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                     loading="lazy"
-                    onError={() => setImgError(true)}
+                    onError={() => {
+                      console.log("Failed to load image:", card.image);
+                      setImgError(true);
+                    }}
                   />
                   
-                  {/* Subtle Texture Overlay for Vintage Feel */}
-                  <div className="absolute inset-0 bg-amber-900/10 mix-blend-multiply pointer-events-none"></div>
-                  
-                  {/* Inner Border */}
-                  <div className="absolute inset-1 border border-black/20 rounded pointer-events-none"></div>
+                  {/* Slight paper texture overlay */}
+                  <div className="absolute inset-0 bg-amber-50/10 mix-blend-multiply pointer-events-none"></div>
                 </>
               ) : (
                 /* Fallback CSS Design if no image or error loading */
@@ -94,18 +104,7 @@ const Card: React.FC<CardProps> = ({
                         {card?.name}
                       </h3>
                     </div>
-                    
-                    <div className="text-[8px] text-slate-400 text-center italic z-10">
-                       {isReversed ? "Reversed" : "Upright"}
-                    </div>
                   </div>
-                </div>
-              )}
-              
-              {/* Reversed Indicator Label */}
-              {isReversed && (
-                <div className="absolute bottom-2 right-2 bg-black/60 px-2 py-0.5 rounded text-[8px] text-white uppercase tracking-wider backdrop-blur-md border border-white/10">
-                  Rev
                 </div>
               )}
             </div>

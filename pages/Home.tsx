@@ -1,34 +1,61 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Moon, Star, ChevronRight } from 'lucide-react';
+import { Moon, Star, ChevronRight, Sparkles } from 'lucide-react';
 import Card from '../components/Card';
 import { useApp } from '../App';
 import { drawCards } from '../services/tarotService';
+import { interpretReading } from '../services/geminiService';
 import { DrawnCard, SpreadType } from '../types';
 
 const Home: React.FC = () => {
-  const { user, updateDailyDraw } = useApp();
+  const { user, saveDailyReading } = useApp();
   const [dailyCard, setDailyCard] = useState<DrawnCard | null>(null);
   const [revealed, setRevealed] = useState(false);
+  const [aiReading, setAiReading] = useState<string>('');
+  const [loading, setLoading] = useState(false);
 
   const today = new Date().toISOString().split('T')[0];
-  const hasDrawnToday = user.lastDailyDraw === today;
+  
+  // Check if we already have a reading for today in the user state
+  const existingReading = user.dailyReading && user.dailyReading.date === today ? user.dailyReading : null;
 
   useEffect(() => {
-    if (hasDrawnToday) {
-      // In a real app, we'd store the actual card drawn today in history to retrieve it here.
-      // For this demo, if they have drawn, we show a placeholder message or re-draw (simplified).
-      // Let's just let them see the card they drew if it was in session state, but for persistent refresh, 
-      // we will just show "Come back tomorrow".
+    if (existingReading) {
+      setDailyCard(existingReading.card);
+      setAiReading(existingReading.interpretation);
+      setRevealed(true);
     }
-  }, [hasDrawnToday]);
+  }, [existingReading]);
 
-  const handleDailyDraw = () => {
-    if (hasDrawnToday) return;
+  const handleDailyDraw = async () => {
+    if (existingReading) return;
+    
+    // 1. Draw the card
     const cards = drawCards(1, ['Daily Insight']);
-    setDailyCard(cards[0]);
+    const drawn = cards[0];
+    setDailyCard(drawn);
+    
+    // 2. Reveal animation
     setTimeout(() => setRevealed(true), 100);
-    updateDailyDraw();
+    
+    // 3. Fetch AI Reading
+    setLoading(true);
+    const interpretation = await interpretReading(
+      SpreadType.OneCard, 
+      "What is my guidance for today?", 
+      [drawn],
+      true // Indicates this is a short daily draw
+    );
+    
+    setAiReading(interpretation);
+    setLoading(false);
+
+    // 4. Save to persistent state
+    saveDailyReading({
+      date: today,
+      card: drawn,
+      interpretation: interpretation
+    });
   };
 
   return (
@@ -42,11 +69,11 @@ const Home: React.FC = () => {
       </header>
 
       {/* Daily Card Section */}
-      <section className="flex flex-col items-center gap-6 min-h-[300px]">
+      <section className="flex flex-col items-center gap-6 min-h-[400px]">
         <div className="relative w-full flex justify-center">
           <div className="absolute inset-0 bg-fuchsia-500/10 blur-[60px] rounded-full pointer-events-none"></div>
           
-          {!hasDrawnToday && !dailyCard ? (
+          {!dailyCard ? (
             <div className="text-center space-y-4 animate-float">
               <Card isRevealed={false} onClick={handleDailyDraw} size="lg" label="Tap to Reveal" />
               <h2 className="text-xl font-serif text-slate-200 mt-4">Your Daily Card</h2>
@@ -54,28 +81,35 @@ const Home: React.FC = () => {
                 Focus on your intention for the day and tap the card to reveal your guidance.
               </p>
             </div>
-          ) : hasDrawnToday && !dailyCard ? (
-             <div className="text-center p-8 border border-white/10 rounded-2xl bg-white/5 backdrop-blur-sm">
-                <Moon className="w-12 h-12 text-fuchsia-400 mx-auto mb-4" />
-                <h2 className="text-xl font-serif text-slate-200">Daily Insight Received</h2>
-                <p className="text-slate-400 text-sm mt-2">
-                  The stars have spoken for today. Return tomorrow for new guidance.
-                </p>
-             </div>
           ) : (
-            <div className="flex flex-col items-center gap-4 animate-in fade-in duration-700">
+            <div className="flex flex-col items-center gap-6 animate-in fade-in duration-700 w-full">
               <Card 
-                card={dailyCard!.card} 
-                isReversed={dailyCard!.isReversed} 
+                card={dailyCard.card} 
+                isReversed={false}
                 isRevealed={revealed} 
                 size="lg"
                 label="Daily Insight"
               />
-              <div className="text-center max-w-xs bg-black/40 p-4 rounded-xl border border-white/10 backdrop-blur-md">
-                <h3 className="text-lg font-bold text-gold-400 font-serif">{dailyCard!.card.name}</h3>
-                <p className="text-xs text-slate-300 mt-2 leading-relaxed">
-                   {dailyCard!.isReversed ? dailyCard!.card.meaningReversed : dailyCard!.card.meaningUpright}
-                </p>
+              
+              {/* Reading Display */}
+              <div className="w-full max-w-sm">
+                 {loading ? (
+                   <div className="flex flex-col items-center justify-center p-6 bg-white/5 rounded-2xl border border-white/10">
+                      <Sparkles className="animate-spin text-fuchsia-400 mb-2" size={24} />
+                      <p className="text-xs text-fuchsia-200 uppercase tracking-widest animate-pulse">Connecting to Spirit...</p>
+                   </div>
+                 ) : (
+                   <div className="bg-gradient-to-b from-slate-900/80 to-purple-900/40 p-5 rounded-2xl border border-white/10 backdrop-blur-md shadow-xl">
+                      <h3 className="text-lg font-bold text-gold-400 font-serif text-center mb-3">
+                        {dailyCard.card.name}
+                      </h3>
+                      <div className="prose prose-invert prose-sm text-center">
+                        <p className="text-slate-200 text-sm leading-relaxed font-light italic">
+                          "{aiReading}"
+                        </p>
+                      </div>
+                   </div>
+                 )}
               </div>
             </div>
           )}
